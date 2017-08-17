@@ -85,7 +85,7 @@ setup(
     data_files=[(
         (BASE_DIR, ['data/nssm_original.exe'])
     )],
-    install_requires=['indy-plenum-dev==1.0.95',
+    install_requires=['indy-plenum-dev==1.0.97',
                       'indy-anoncreds-dev==1.0.25',
                       'python-dateutil',
                       'timeout-decorator'],
@@ -111,7 +111,9 @@ setup(
              'scripts/delete_sovrin_node.bat',
              'scripts/restart_upgrade_agent.bat',
              'scripts/install_nssm.bat',
-             'scripts/read_ledger'],
+             'scripts/read_ledger',
+             'scripts/test_some_write_keys_others_read_them',
+             'scripts/test_users_write_and_read_own_keys'],
     cmdclass={
         'install': EnhancedInstall,
         'develop': EnhancedInstallDev
