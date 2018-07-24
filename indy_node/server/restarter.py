@@ -40,10 +40,8 @@ class Restarter(NodeMaintainer):
         (event_type, when) = self.lastActionEventInfo
 
         if event_type != RestartLog.STARTED:
-            logger.debug(
-                'Restart for node {} was not scheduled. '
-                'Last event is {}:{}'.format(
-                    self.nodeName, event_type, when))
+            logger.info('Restart for node {} was not scheduled. Last event is {}:{}'.
+                        format(self.nodeName, event_type, when))
             return False
 
         return True
@@ -58,7 +56,7 @@ class Restarter(NodeMaintainer):
             "Restart of node '{}' scheduled on {} "
             "completed successfully".format(self.nodeName, when))
 
-    def handleActionTxn(self, req: Request) -> None:
+    def handleRestartRequest(self, req: Request) -> None:
         """
         Handles transaction of type POOL_RESTART
         Can schedule or cancel restart to a newer
@@ -75,33 +73,8 @@ class Restarter(NodeMaintainer):
             when = dateutil.parser.parse(txn[DATETIME]) \
                 if DATETIME in txn.keys() and txn[DATETIME] not in ["0", "", None] \
                 else None
-
-            if self.scheduledAction:
-                if self.scheduledAction == when:
-                    logger.debug(
-                        "Node {} already scheduled restart".format(
-                            self.nodeName))
-                    return
-                else:
-                    logger.info(
-                        "Node '{}' cancels previous restart and schedules a new one".format(
-                            self.nodeName))
-                    self._cancelScheduledRestart()
-
-            now = datetime.utcnow().replace(tzinfo=dateutil.tz.tzutc())
-            if when is None or now >= when:
-                msg = RestartMessage().toJson()
-                try:
-                    asyncio.ensure_future(self._open_connection_and_send(msg))
-                except Exception as ex:
-                    logger.warning(ex.args[0])
-                return
-
             fail_timeout = txn.get(TIMEOUT, self.defaultActionTimeout)
-            logger.info("Node '{}' schedules restart".format(
-                self.nodeName))
-
-            self._scheduleRestart(when, fail_timeout)
+            self.requestRestart(when, fail_timeout)
             return
 
         if action == CANCEL:
@@ -115,6 +88,35 @@ class Restarter(NodeMaintainer):
             "Got {} transaction with unsupported action {}".format(
                 POOL_RESTART, action))
 
+    def requestRestart(self, when=None, fail_timeout=None):
+        if self.scheduledAction:
+            if self.scheduledAction == when:
+                logger.debug(
+                    "Node {} already scheduled restart".format(
+                        self.nodeName))
+                return
+            else:
+                logger.info(
+                    "Node '{}' cancels previous restart and schedules a new one".format(
+                        self.nodeName))
+                self._cancelScheduledRestart()
+
+        now = datetime.utcnow().replace(tzinfo=dateutil.tz.tzutc())
+        if when is None or now >= when:
+            msg = RestartMessage().toJson()
+            try:
+                asyncio.ensure_future(self._open_connection_and_send(msg))
+            except Exception as ex:
+                logger.warning(ex.args[0])
+            return
+
+        if fail_timeout is None:
+            fail_timeout = self.defaultActionTimeout
+        logger.info("Node '{}' schedules restart".format(
+            self.nodeName))
+
+        self._scheduleRestart(when, fail_timeout)
+
     def _scheduleRestart(self,
                          when: Union[datetime, str],
                          failTimeout) -> None:
@@ -125,7 +127,7 @@ class Restarter(NodeMaintainer):
         :param when: restart time
         """
         assert isinstance(when, (str, datetime))
-        logger.info("{}'s restartr processing restart"
+        logger.info("{}'s restarter processing restart"
                     .format(self))
         if isinstance(when, str):
             when = dateutil.parser.parse(when)
